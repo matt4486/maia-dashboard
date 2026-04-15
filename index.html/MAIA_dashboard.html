@@ -848,6 +848,7 @@
     const API_KEY = 'AIzaSyBfXo3RuLAhm3wNXJEmLkWFyzgSrRFYpQQ';
     const SHEET_ID = '12dAywf9-VVPBSqOIGJCbK1p9fdR7XuulArtWnY8GRhQ';
     const WEBHOOK_VOCAL = 'https://maia.app.n8n.cloud/webhook/Rapport maintenance';
+    const GROQ_API_KEY = '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';
     const WEBHOOK_ECRIT = 'https://maia.app.n8n.cloud/webhook/Rapport-texte';
 
     const COL = {
@@ -1056,24 +1057,19 @@
     async function transcribeAudio(chunks, target) {
       const blob = new Blob(chunks, { type: 'audio/webm' });
       const formData = new FormData();
-      formData.append('audio', blob, 'audio.webm');
-
-      // Injecter les notes terrain si présentes
-      const notesText = notes.map(n => n.content).join('\n');
-      if (notesText) formData.append('notes', notesText);
+      formData.append('file', blob, 'audio.webm');
+      formData.append('model', 'whisper-large-v3');
+      formData.append('language', 'fr');
+      formData.append('response_format', 'json');
 
       try {
-        const res = await fetch(WEBHOOK_VOCAL, { 
+        const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
           method: 'POST',
-          headers: { 'x-secret-token': 'mAI-xK9#pL2$vR7@nQ4&jW8!' },
-          body: formData 
+          headers: { 'Authorization': 'Bearer ' + GROQ_API_KEY },
+          body: formData
         });
-        const text = await res.text();
-        let transcript = text;
-        try { 
-          const j = JSON.parse(text); 
-          transcript = j.transcript || j.transcription || j.text || text; 
-        } catch(e) {}
+        const data = await res.json();
+        const transcript = data.text || '';
 
         if (target === 'main') {
           currentTranscript = transcript;
