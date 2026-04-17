@@ -713,15 +713,11 @@
               <button class="record-btn" id="recordBtn" onclick="toggleRecord()">🎤</button>
               <div class="record-status" id="recordStatus">Appuyez pour commencer l'enregistrement</div>
               <div class="transcript-box" id="transcriptBox" style="display:none;"></div>
-              <div class="vocal-actions" id="step1Actions" style="display:none;">
-                <button class="btn-accent" onclick="goToStep2()">Valider la transcription →</button>
-                <button class="btn-outline" onclick="resetVocal()">Recommencer</button>
-              </div>
             </div>
 
             <div id="vocalStep2" style="display:none;">
-              <div class="vocal-title">✏️ Vérifiez la transcription</div>
-              <div class="vocal-sub">Corrigez si nécessaire avant de générer le rapport</div>
+              <div class="vocal-title">✏️ Vérifiez et complétez</div>
+              <div class="vocal-sub">Ajoutez des précisions si nécessaire, puis générez le rapport</div>
               <textarea class="note-textarea" id="transcriptEdit" style="height:160px; margin-bottom:16px;"></textarea>
               <div class="vocal-actions">
                 <button class="btn-accent" id="generateBtn" onclick="generateReport()">Générer le rapport IA →</button>
@@ -845,7 +841,7 @@
 
   <script>
     // ===== CONFIG =====
-    const API_KEY = 'AIzaSyBfXo3RuLAhm3wNXJEmLkWFyzgSrRFYpQQ';
+    const API_KEY = 'AIzaSyAZ0tzTTgArBNAhJUdG70yng4K9yaZe794';
     const SHEET_ID = '12dAywf9-VVPBSqOIGJCbK1p9fdR7XuulArtWnY8GRhQ';
     const WEBHOOK_VOCAL = 'https://maia.app.n8n.cloud/webhook/Rapport maintenance';
     const GROQ_API_KEY = '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';
@@ -858,6 +854,8 @@
     };
 
     let allData = [];
+
+
     let filteredData = [];
     let notes = JSON.parse(localStorage.getItem('maia_notes') || '[]');
     let currentTranscript = '';
@@ -1073,10 +1071,9 @@
 
         if (target === 'main') {
           currentTranscript = transcript;
-          document.getElementById('transcriptBox').textContent = transcript;
-          document.getElementById('transcriptBox').style.display = 'block';
-          document.getElementById('step1Actions').style.display = 'flex';
           document.getElementById('recordStatus').textContent = 'Transcription terminée ✓';
+          // Passer directement à l'étape 2
+          setTimeout(() => goToStep2(), 600);
         } else {
           document.getElementById('noteTranscript').textContent = transcript;
           document.getElementById('noteTranscript').style.display = 'block';
