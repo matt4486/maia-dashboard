@@ -869,6 +869,13 @@
             <div id="vocalNotesContent" style="font-size:13px; color:var(--text3); line-height:1.6;"></div>
           </div>
 
+          <!-- Bannière rapport complémentaire -->
+          <div id="complBanner" style="display:none; background:rgba(255,109,0,0.08); border:1px solid rgba(255,109,0,0.3); border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+            <div style="font-size:11px; font-weight:600; color:var(--orange); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">🔁 Rapport complémentaire</div>
+            <div id="complBannerText" style="font-size:13px; color:var(--text3); line-height:1.6;"></div>
+            <button onclick="cancelRapportComplementaire()" style="margin-top:10px; font-size:12px; color:var(--text2); background:none; border:none; cursor:pointer; text-decoration:underline;">✕ Annuler — faire un nouveau rapport</button>
+          </div>
+
           <div class="vocal-card">
             <div class="vocal-steps">
               <div class="step-dot active" id="step1">1</div>
@@ -983,12 +990,18 @@
       </div>
       <div class="modal-meta" id="modalMeta"></div>
       <div id="modalBody"></div>
-      <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border); display:flex; gap:12px; align-items:center;">
+      <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border); display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
         <span style="font-size:12px; color:var(--text2); text-transform:uppercase; letter-spacing:0.08em;">Statut :</span>
         <span id="modalStatutBadge"></span>
-        <button class="refresh-btn" id="modalStatutBtn" onclick="cycleStatutModal()" style="margin-left:auto;">
-          🔄 Changer le statut
-        </button>
+        <div style="margin-left:auto; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="refresh-btn" id="modalRapportCompl" onclick="startRapportComplementaire()"
+            style="display:none; border-color:rgba(0,212,255,0.4); color:var(--accent);">
+            🎤 Rapport complémentaire
+          </button>
+          <button class="refresh-btn" id="modalStatutBtn" onclick="cycleStatutModal()">
+            🔄 Changer le statut
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1045,6 +1058,7 @@
     let isNoteRecording = false;
     let noteMediaRecorder = null;
     let noteAudioChunks = [];
+    let rapportComplementaireCtx = null; // { idx, equip, rapportExistant, rowNum }
 
     // ===== NAVIGATION =====
     function showPage(page) {
@@ -1173,6 +1187,10 @@
         ${row[COL.actions]?`<div class="modal-section"><div class="modal-section-title">Actions réalisées</div><div class="modal-section-content">${row[COL.actions]}</div></div>`:''}
         ${row[COL.rapport]?`<div class="modal-section"><div class="modal-section-title">Rapport complet</div><div class="rapport-box">${row[COL.rapport]}</div></div>`:''}`;
       document.getElementById('modalStatutBadge').innerHTML = getBadge(row[COL.statut]);
+      // Afficher bouton rapport complémentaire si statut non terminé
+      const statut = row[COL.statut] || '';
+      const btnCompl = document.getElementById('modalRapportCompl');
+      btnCompl.style.display = (statut === 'A suivre' || statut === 'En attente') ? 'block' : 'none';
       document.getElementById('modalOverlay').classList.add('open');
     }
 
@@ -1277,6 +1295,67 @@
       const btn = document.getElementById('generateBtn');
       btn.disabled = true; btn.textContent = 'Génération en cours...';
 
+      // MODE RAPPORT COMPLÉMENTAIRE
+      if (rapportComplementaireCtx) {
+        try {
+          // 1. Générer le nouveau rapport via n8n
+          const res = await fetch(WEBHOOK_ECRIT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texte: text, mode: 'structuration_seule' })
+          });
+
+          let nouveauRapport = '';
+          if (res.ok) {
+            const data = await res.json();
+            nouveauRapport = data.rapport || data.text || text;
+          } else {
+            nouveauRapport = text;
+          }
+
+          // 2. Concaténer avec l'ancien rapport
+          const dateStr = new Date().toLocaleDateString('fr-FR');
+          const techStr = currentUser ? currentUser.trigram : '';
+          const separateur = `
+
+────────────────────────────────
+📋 Rapport complémentaire du ${dateStr}${techStr ? ' — ' + techStr : ''}
+────────────────────────────────
+`;
+          const rapportFinal = (rapportComplementaireCtx.rapportExistant || '') + separateur + nouveauRapport;
+
+          // 3. Écrire dans le sheet via WEBHOOK_ECRIT avec flag update
+          const colRapport = String.fromCharCode(65 + COL.rapport);
+          const range = encodeURIComponent(`Feuille 1!${colRapport}${rapportComplementaireCtx.rowNum}`);
+          await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=RAW&key=${API_KEY}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [[rapportFinal]] })
+          });
+
+          // 4. Mettre à jour allData en mémoire
+          allData[rapportComplementaireCtx.idx][COL.rapport] = rapportFinal;
+
+          // 5. Afficher confirmation
+          document.getElementById('rapportContent').textContent = '✅ Rapport complémentaire ajouté avec succès.';
+          document.getElementById('rapportResult').classList.add('visible');
+          document.getElementById('vocalStep2').style.display = 'none';
+          document.getElementById('vocalStep3').style.display = 'block';
+          setStep(3);
+
+          // Masquer la bannière
+          document.getElementById('complBanner').style.display = 'none';
+          rapportComplementaireCtx = null;
+
+        } catch(e) {
+          btn.disabled = false;
+          btn.textContent = 'Générer le rapport IA →';
+          alert('❌ Erreur lors de l'ajout du rapport complémentaire.');
+        }
+        return;
+      }
+
+      // MODE NORMAL
       try {
         const res = await fetch(WEBHOOK_ECRIT, {
           method: 'POST',
@@ -1315,6 +1394,7 @@
       document.getElementById('vocalStep2').style.display = 'none';
       document.getElementById('vocalStep3').style.display = 'none';
       document.getElementById('rapportResult').classList.remove('visible');
+      document.getElementById('complBanner').style.display = 'none';
       setStep(1);
     }
 
@@ -1327,6 +1407,47 @@
       } else {
         preview.style.display = 'none';
       }
+    }
+
+    // ===== RAPPORT COMPLÉMENTAIRE =====
+    function startRapportComplementaire() {
+      if (currentModalIdx === null) return;
+      const row = allData[currentModalIdx];
+      if (!row) return;
+
+      // Calculer le numéro de ligne dans le sheet (header en ligne 1, données à partir de ligne 2)
+      const rowNum = currentModalIdx + 2;
+
+      rapportComplementaireCtx = {
+        idx: currentModalIdx,
+        equip: row[COL.equip] || '',
+        rapportExistant: row[COL.rapport] || '',
+        rowNum: rowNum
+      };
+
+      // Fermer le modal et aller sur la page vocale
+      document.getElementById('modalOverlay').classList.remove('open');
+      resetVocal();
+
+      // Afficher la bannière
+      const banner = document.getElementById('complBanner');
+      banner.style.display = 'block';
+      document.getElementById('complBannerText').textContent =
+        `Intervention : ${rapportComplementaireCtx.equip} — votre rapport viendra s'ajouter au rapport existant.`;
+
+      // Naviguer vers la page vocale
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-vocal').classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.querySelectorAll('.nav-item')[1].classList.add('active');
+      document.getElementById('pageTitle').textContent = 'Saisie vocale';
+      document.getElementById('refreshBtn').style.display = 'none';
+      document.getElementById('lastUpdate').style.display = 'none';
+    }
+
+    function cancelRapportComplementaire() {
+      rapportComplementaireCtx = null;
+      document.getElementById('complBanner').style.display = 'none';
     }
 
     // ===== CHANGEMENT STATUT =====
