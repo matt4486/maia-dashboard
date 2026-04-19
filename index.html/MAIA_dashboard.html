@@ -1328,6 +1328,7 @@
           // 3. Écrire dans le sheet via webhook n8n
           await fetch(WEBHOOK_MAJ, {
             method: 'POST',
+            mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'rapport', rowNum: rapportComplementaireCtx.rowNum, valeur: rapportFinal })
           });
@@ -1388,7 +1389,6 @@
       document.getElementById('recordBtn').textContent = '🎤';
       document.getElementById('recordStatus').textContent = 'Appuyez pour commencer l\'enregistrement';
       document.getElementById('transcriptBox').style.display = 'none';
-      document.getElementById('step1Actions').style.display = 'none';
       document.getElementById('vocalStep1').style.display = 'block';
       document.getElementById('vocalStep2').style.display = 'none';
       document.getElementById('vocalStep3').style.display = 'none';
@@ -1464,6 +1464,7 @@
       try {
         await fetch(WEBHOOK_MAJ, {
           method: 'POST',
+          mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'statut', rowNum, valeur: newStatut })
         });
@@ -1752,6 +1753,7 @@ Communiquez ce code au technicien.`);
       try {
         const res = await fetch(WEBHOOK_PERSONNEL, {
           method: 'POST',
+          mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             trigramme: trigram,
@@ -1761,10 +1763,6 @@ Communiquez ce code au technicien.`);
             role: isResp ? 'responsable' : 'technicien'
           })
         });
-        if (!res.ok) {
-          alert(`❌ Erreur lors de l'ajout (${res.status}). Vérifiez le workflow n8n.`);
-          return;
-        }
       } catch(e) {
         alert('❌ Impossible de joindre n8n. Vérifiez votre connexion.');
         return;
