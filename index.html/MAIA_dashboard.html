@@ -1039,6 +1039,7 @@
     const GROQ_API_KEY = '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';
     const WEBHOOK_ECRIT = 'https://maia.app.n8n.cloud/webhook/Rapport-texte';
     const WEBHOOK_PERSONNEL = 'https://maia.app.n8n.cloud/webhook/a94682c8-c1fa-4f1e-8856-d555e43c9118';
+    const WEBHOOK_MAJ = 'https://maia.app.n8n.cloud/webhook/maj-intervention';
 
     const COL = {
       tech: 0, date: 1, equip: 2, ref: 3, duree: 4,
@@ -1324,13 +1325,11 @@
 `;
           const rapportFinal = (rapportComplementaireCtx.rapportExistant || '') + separateur + nouveauRapport;
 
-          // 3. Écrire dans le sheet via WEBHOOK_ECRIT avec flag update
-          const colRapport = String.fromCharCode(65 + COL.rapport);
-          const range = encodeURIComponent(`Feuille 1!${colRapport}${rapportComplementaireCtx.rowNum}`);
-          await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=RAW&key=${API_KEY}`, {
-            method: 'PUT',
+          // 3. Écrire dans le sheet via webhook n8n
+          await fetch(WEBHOOK_MAJ, {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ values: [[rapportFinal]] })
+            body: JSON.stringify({ type: 'rapport', rowNum: rapportComplementaireCtx.rowNum, valeur: rapportFinal })
           });
 
           // 4. Mettre à jour allData en mémoire
@@ -1433,7 +1432,7 @@
       const banner = document.getElementById('complBanner');
       banner.style.display = 'block';
       document.getElementById('complBannerText').textContent =
-        `Intervention : ${rapportComplementaireCtx.equip} — votre rapport viendra s'ajouter au rapport existant.`;
+        'Intervention : ' + rapportComplementaireCtx.equip + ' — votre rapport viendra s'ajouter au rapport existant.';
 
       // Naviguer vers la page vocale
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1443,6 +1442,7 @@
       document.getElementById('pageTitle').textContent = 'Saisie vocale';
       document.getElementById('refreshBtn').style.display = 'none';
       document.getElementById('lastUpdate').style.display = 'none';
+      loadNotesInVocal();
     }
 
     function cancelRapportComplementaire() {
@@ -1459,17 +1459,13 @@
       const current = row[COL.statut] || 'En attente';
       const nextIdx = (STATUTS.indexOf(current) + 1) % STATUTS.length;
       const newStatut = STATUTS[nextIdx];
-
-      // Trouver la ligne dans le sheet (header + 1)
       const rowNum = idx + 2;
-      const colLetter = String.fromCharCode(65 + COL.statut); // G
-      const range = `Feuille 1!${colLetter}${rowNum}`;
 
       try {
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${API_KEY}`, {
-          method: 'PUT',
+        await fetch(WEBHOOK_MAJ, {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [[newStatut]] })
+          body: JSON.stringify({ type: 'statut', rowNum, valeur: newStatut })
         });
         allData[idx][COL.statut] = newStatut;
         applyFilters();
