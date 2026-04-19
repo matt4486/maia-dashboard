@@ -1459,10 +1459,11 @@
       const rowNum = row._rowNum || (idx + 2);
 
       try {
+        const rapportExistant = row[COL.rapport] || '';
         await fetch(WEBHOOK_MAJ, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ type: 'statut', rowNum, valeur: newStatut })
+          body: JSON.stringify({ type: 'statut', rowNum, valeur: newStatut, rapport: rapportExistant })
         });
         allData[idx][COL.statut] = newStatut;
         applyFilters();
